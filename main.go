@@ -22,15 +22,6 @@ type Parcel struct {
 	CreatedAt string
 }
 
-type ParcelHistory struct {
-	ID        int
-	ParcelNum int
-	Client    int
-	Address   string
-	Status    string
-	ChangedAt string
-}
-
 type ParcelService struct {
 	store ParcelStore
 }
@@ -76,20 +67,6 @@ func (s ParcelService) PrintClientParcels(client int) error {
 	return nil
 }
 
-func (s ParcelService) PrintClientHistory(client int) error {
-	history, err := s.store.GetHistoryByClient(client)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("История клиента №%d:\n", client)
-	for _, h := range history {
-		fmt.Printf("Посылка №%d: адрес: %s, статус: %s, изменено: %s\n",
-			h.ParcelNum, h.Address, h.Status, h.ChangedAt)
-	}
-	fmt.Println()
-	return nil
-}
-
 func (s ParcelService) NextStatus(number int) error {
 	parcel, err := s.store.Get(number)
 	if err != nil {
@@ -120,36 +97,12 @@ func (s ParcelService) Delete(number int) error {
 }
 
 func main() {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
+	// настройте подключение к БД
 
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS parcel (
-		number INTEGER PRIMARY KEY AUTOINCREMENT,
-		client INTEGER NOT NULL,
-		status TEXT NOT NULL,
-		address TEXT NOT NULL,
-		created_at TEXT NOT NULL
-	);
-	CREATE TABLE IF NOT EXISTS parcel_history (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		parcel_number INTEGER,
-		client INTEGER,
-		address TEXT,
-		status TEXT,
-		changed_at TEXT
-	)
-	`)
-	if err != nil {
-		panic(err)
-	}
-
-	store := NewParcelStore(db)
+	store := // создайте объект ParcelStore функцией NewParcelStore
 	service := NewParcelService(store)
 
+	// регистрация посылки
 	client := 1
 	address := "Псков, д. Пушкина, ул. Колотушкина, д. 5"
 	p, err := service.Register(client, address)
@@ -158,6 +111,7 @@ func main() {
 		return
 	}
 
+	// изменение адреса
 	newAddress := "Саратов, д. Верхние Зори, ул. Козлова, д. 25"
 	err = service.ChangeAddress(p.Number, newAddress)
 	if err != nil {
@@ -165,48 +119,54 @@ func main() {
 		return
 	}
 
+	// изменение статуса
 	err = service.NextStatus(p.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// вывод посылок клиента
 	err = service.PrintClientParcels(client)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// попытка удаления отправленной посылки
 	err = service.Delete(p.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// вывод посылок клиента
+	// предыдущая посылка не должна удалиться, т.к. её статус НЕ «зарегистрирована»
 	err = service.PrintClientParcels(client)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// регистрация новой посылки
 	p, err = service.Register(client, address)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// удаление новой посылки
 	err = service.Delete(p.Number)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// вывод посылок клиента
+	// здесь не должно быть последней посылки, т.к. она должна была успешно удалиться
 	err = service.PrintClientParcels(client)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	// Вывод истории клиент
-	service.PrintClientHistory(client)
 }
